@@ -25,7 +25,9 @@ const (
 	dbname   = "project-sem-1"
 )
 
-func initDatabase(db *sql.DB) error {
+var db *sql.DB // Глобальная переменная для соединения с БД
+
+func initDatabase() error {
 	createTableQuery := `
     CREATE TABLE IF NOT EXISTS prices (
         id SERIAL PRIMARY KEY,
@@ -44,6 +46,19 @@ func initDatabase(db *sql.DB) error {
 }
 
 func main() {
+	var err error
+	// Инициализация соединения с БД
+	db, err = sql.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname))
+	if err != nil {
+		log.Fatalf("Ошибка подключения к базе данных: %v", err)
+	}
+	defer db.Close() // Закрытие соединения при завершении работы приложения
+
+	// Инициализация базы данных
+	if err := initDatabase(); err != nil {
+		log.Fatalf("Ошибка инициализации базы данных: %v", err)
+	}
+
 	router := http.NewServeMux()
 	router.HandleFunc("/api/v0/prices", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -75,6 +90,25 @@ func main() {
 			var totalPrice float64
 			categorySet := make(map[string]struct{})
 
+			tx, err := db.Begin()
+			if err != nil {
+				http.Error(w, "Transaction error", http.StatusInternalServerError)
+				log.Printf("Ошибка начала транзакции: %v", err)
+				return
+			}
+
+			stmt, err := tx.Prepare(`
+                INSERT INTO prices (name, category, price, create_date) 
+                VALUES ($1, $2, $3, $4)
+            `)
+			if err != nil {
+				http.Error(w, "SQL preparation error", http.StatusInternalServerError)
+				log.Printf("Ошибка подготовки SQL-запроса: %v", err)
+				tx.Rollback()
+				return
+			}
+			defer stmt.Close()
+
 			for _, f := range reader.File {
 				if f.Name == "data.csv" {
 					csvFile, err := f.Open()
@@ -92,44 +126,11 @@ func main() {
 						return
 					}
 
-					db, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname))
-					if err != nil {
-						http.Error(w, "Database connection error", http.StatusInternalServerError)
-						log.Printf("Ошибка подключения к базе данных: %v", err)
-						return
-					}
-					defer db.Close()
-
-					if err := initDatabase(db); err != nil {
-						http.Error(w, "Database initialization error", http.StatusInternalServerError)
-						log.Printf("Ошибка инициализации базы данных: %v", err)
-						return
-					}
-
-					tx, err := db.Begin()
-					if err != nil {
-						http.Error(w, "Transaction error", http.StatusInternalServerError)
-						log.Printf("Ошибка начала транзакции: %v", err)
-						return
-					}
-
-					stmt, err := tx.Prepare(`
-                        INSERT INTO prices (name, category, price, create_date) 
-                        VALUES ($1, $2, $3, $4)
-                    `)
-					if err != nil {
-						http.Error(w, "SQL preparation error", http.StatusInternalServerError)
-						log.Printf("Ошибка подготовки SQL-запроса: %v", err)
-						tx.Rollback()
-						return
-					}
-					defer stmt.Close()
-
 					for _, row := range rows[1:] {
-						name := row[1]
-						category := row[2]
-						priceStr := row[3]
-						createDate := row[4]
+						name := row[0]
+						category := row[1]
+						priceStr := row[2]
+						createDate := row[3]
 
 						if name == "" || category == "" || priceStr == "" || createDate == "" {
 							log.Printf("Пропущена строка: недостаточно данных")
@@ -203,14 +204,6 @@ func main() {
 }
 
 func handleGetPrices(w http.ResponseWriter, _ *http.Request) {
-	db, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname))
-	if err != nil {
-		http.Error(w, "Database connection error", http.StatusInternalServerError)
-		log.Printf("Ошибка подключения к базе данных: %v", err)
-		return
-	}
-	defer db.Close()
-
 	rows, err := db.Query("SELECT id, name, category, price, create_date FROM prices")
 	if err != nil {
 		http.Error(w, "Error querying database", http.StatusInternalServerError)
