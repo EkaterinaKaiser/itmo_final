@@ -126,12 +126,17 @@ func handlePostPrices(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Проверка данных
-			for _, row := range rows[1:] {
-				name := row[0]
-				category := row[1]
-				priceStr := row[2]
-				createDate := row[3]
+			// Проверка данных, начиная со второго столбца
+			for _, row := range rows[1:] { // Пропускаем заголовок
+				if len(row) < 4 { // Убедимся, что в строке достаточно столбцов
+					log.Printf("Пропущена строка: недостаточно данных")
+					continue
+				}
+
+				name := row[1]       // Второй столбец
+				category := row[2]   // Третий столбец
+				priceStr := row[3]   // Четвертый столбец
+				createDate := row[4] // Пятый столбец
 
 				if name == "" || category == "" || priceStr == "" || createDate == "" {
 					log.Printf("Пропущена строка: недостаточно данных")
