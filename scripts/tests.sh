@@ -20,6 +20,25 @@ TEST_TAR="test_data.tar"
 TEST_CSV="test_data.csv"
 RESPONSE_ZIP="response.zip"
 
+wait_for_server() {
+    local max_attempts=30
+    local delay=1
+    local attempt=1
+    
+    echo "Waiting for server to be ready..."
+    while [ $attempt -le $max_attempts ]; do
+        if curl -s "http://localhost:8080/api/v0/prices" > /dev/null; then
+            echo "Server is ready!"
+            return 0
+        fi
+        echo "Attempt $attempt of $max_attempts..."
+        sleep $delay
+        attempt=$((attempt + 1))
+    done
+    echo "Server failed to become ready in time"
+    return 1
+}
+
 create_test_files() {
     local level=$1
     if [ "$level" -eq 3 ]; then
@@ -302,6 +321,9 @@ cleanup() {
 main() {
     local level=$1
     local failed=0
+    
+    # Добавить вызов функции перед началом тестов
+    wait_for_server || exit 1
     
     case $level in
         1)

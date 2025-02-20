@@ -1,28 +1,27 @@
-Print service container logs: 239ec53516264d6894aca1001ed5438f_postgres15_a2a9e1
-/usr/bin/docker logs --details bc32cb74da1ad168d6834a79468d281b0a65cf55b4f3c0f7b4e7ed3346c9faee
+Print service container logs: 8246e98a820d492c8f9dabd6e8f577fc_postgres15_30f81e
+/usr/bin/docker logs --details d4243b5190eee98168be6d4f7caef6ca931d206323b36214d1a6955ef5a713e9
  initdb: warning: enabling "trust" authentication for local connections
  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
- 2025-02-20 14:51:19.258 UTC [1] LOG:  starting PostgreSQL 15.11 (Debian 15.11-1.pgdg120+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14) 12.2.0, 64-bit
- 2025-02-20 14:51:19.258 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
- 2025-02-20 14:51:19.258 UTC [1] LOG:  listening on IPv6 address "::", port 5432
- The files belonging to this database system will be owned by user "postgres".
- 2025-02-20 14:51:19.259 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
- 2025-02-20 14:51:19.263 UTC [64] LOG:  database system was shut down at 2025-02-20 14:51:19 UTC
- 2025-02-20 14:51:19.267 UTC [1] LOG:  database system is ready to accept connections
- 2025-02-20 14:51:28.335 UTC [75] FATAL:  role "root" does not exist
- 2025-02-20 14:51:38.468 UTC [83] FATAL:  role "root" does not exist
- 2025-02-20 14:51:39.083 UTC [85] ERROR:  relation "prices" does not exist at character 39
- 2025-02-20 14:51:39.083 UTC [85] STATEMENT:  
+ 2025-02-20 14:53:45.282 UTC [1] LOG:  starting PostgreSQL 15.11 (Debian 15.11-1.pgdg120+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14) 12.2.0, 64-bit
+ 2025-02-20 14:53:45.283 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+ 2025-02-20 14:53:45.283 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+ 2025-02-20 14:53:45.284 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+ 2025-02-20 14:53:45.286 UTC [64] LOG:  database system was shut down at 2025-02-20 14:53:45 UTC
+ 2025-02-20 14:53:45.291 UTC [1] LOG:  database system is ready to accept connections
+ 2025-02-20 14:53:54.354 UTC [75] FATAL:  role "root" does not exist
+ 2025-02-20 14:54:04.121 UTC [77] ERROR:  relation "prices" does not exist at character 39
+ 2025-02-20 14:54:04.121 UTC [77] STATEMENT:  
  	                SELECT COUNT(*) FROM prices;
- 2025-02-20 14:51:39.503 UTC [87] ERROR:  relation "prices" does not exist at character 204
- 2025-02-20 14:51:39.503 UTC [87] STATEMENT:  
+ 2025-02-20 14:54:04.491 UTC [86] FATAL:  role "root" does not exist
+ 2025-02-20 14:54:04.584 UTC [87] ERROR:  relation "prices" does not exist at character 204
+ 2025-02-20 14:54:04.584 UTC [87] STATEMENT:  
  	                SELECT 
  	                    COUNT(*) as total_items,
  	                    COUNT(DISTINCT category) as total_categories,
  	                    SUM(price) as total_price
  	                FROM prices;
- 2025-02-20 14:51:39.826 UTC [89] ERROR:  relation "prices" does not exist at character 346
- 2025-02-20 14:51:39.826 UTC [89] STATEMENT:  
+ 2025-02-20 14:54:04.876 UTC [89] ERROR:  relation "prices" does not exist at character 346
+ 2025-02-20 14:54:04.876 UTC [89] STATEMENT:  
  	                WITH stats AS (
  	                    SELECT 
  	                        COUNT(*) as total_items,
@@ -34,6 +33,7 @@ Print service container logs: 239ec53516264d6894aca1001ed5438f_postgres15_a2a9e1
  	                    AND price BETWEEN 300 AND 1000
  	                )
  	                SELECT * FROM stats;
+ The files belonging to this database system will be owned by user "postgres".
  This user must also own the server process.
  
  The database cluster will be initialized with locale "en_US.utf8".
@@ -58,10 +58,10 @@ Print service container logs: 239ec53516264d6894aca1001ed5438f_postgres15_a2a9e1
  
      pg_ctl -D /var/lib/postgresql/data -l logfile start
  
- waiting for server to start....2025-02-20 14:51:18.948 UTC [48] LOG:  starting PostgreSQL 15.11 (Debian 15.11-1.pgdg120+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14) 12.2.0, 64-bit
- 2025-02-20 14:51:18.949 UTC [48] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
- 2025-02-20 14:51:18.952 UTC [51] LOG:  database system was shut down at 2025-02-20 14:51:18 UTC
- 2025-02-20 14:51:18.956 UTC [48] LOG:  database system is ready to accept connections
+ waiting for server to start....2025-02-20 14:53:44.970 UTC [48] LOG:  starting PostgreSQL 15.11 (Debian 15.11-1.pgdg120+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14) 12.2.0, 64-bit
+ 2025-02-20 14:53:44.970 UTC [48] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+ 2025-02-20 14:53:44.973 UTC [51] LOG:  database system was shut down at 2025-02-20 14:53:44 UTC
+ 2025-02-20 14:53:44.977 UTC [48] LOG:  database system is ready to accept connections
   done
  server started
  CREATE DATABASE
@@ -69,21 +69,21 @@ Print service container logs: 239ec53516264d6894aca1001ed5438f_postgres15_a2a9e1
  
  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
  
- 2025-02-20 14:51:19.136 UTC [48] LOG:  received fast shutdown request
- waiting for server to shut down....2025-02-20 14:51:19.136 UTC [48] LOG:  aborting any active transactions
- 2025-02-20 14:51:19.138 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
- 2025-02-20 14:51:19.138 UTC [49] LOG:  shutting down
- 2025-02-20 14:51:19.139 UTC [49] LOG:  checkpoint starting: shutdown immediate
- 2025-02-20 14:51:19.160 UTC [49] LOG:  checkpoint complete: wrote 918 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.014 s, sync=0.006 s, total=0.022 s; sync files=301, longest=0.005 s, average=0.001 s; distance=4222 kB, estimate=4222 kB
- 2025-02-20 14:51:19.166 UTC [48] LOG:  database system is shut down
+ waiting for server to shut down...2025-02-20 14:53:45.160 UTC [48] LOG:  received fast shutdown request
+ .2025-02-20 14:53:45.161 UTC [48] LOG:  aborting any active transactions
+ 2025-02-20 14:53:45.163 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
+ 2025-02-20 14:53:45.163 UTC [49] LOG:  shutting down
+ 2025-02-20 14:53:45.163 UTC [49] LOG:  checkpoint starting: shutdown immediate
+ 2025-02-20 14:53:45.183 UTC [49] LOG:  checkpoint complete: wrote 918 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.014 s, sync=0.005 s, total=0.021 s; sync files=301, longest=0.003 s, average=0.001 s; distance=4222 kB, estimate=4222 kB
+ 2025-02-20 14:53:45.191 UTC [48] LOG:  database system is shut down
   done
  server stopped
  
  PostgreSQL init process complete; ready for start up.
  
-Stop and remove container: 239ec53516264d6894aca1001ed5438f_postgres15_a2a9e1
-/usr/bin/docker rm --force bc32cb74da1ad168d6834a79468d281b0a65cf55b4f3c0f7b4e7ed3346c9faee
-bc32cb74da1ad168d6834a79468d281b0a65cf55b4f3c0f7b4e7ed3346c9faee
-Remove container network: github_network_fe500e89a36141adb2e8b311e4a6433c
-/usr/bin/docker network rm github_network_fe500e89a36141adb2e8b311e4a6433c
-github_network_fe500e89a36141adb2e8b311e4a6433c
+Stop and remove container: 8246e98a820d492c8f9dabd6e8f577fc_postgres15_30f81e
+/usr/bin/docker rm --force d4243b5190eee98168be6d4f7caef6ca931d206323b36214d1a6955ef5a713e9
+d4243b5190eee98168be6d4f7caef6ca931d206323b36214d1a6955ef5a713e9
+Remove container network: github_network_179ba804d671435c9fc1a9e3ec1b53b0
+/usr/bin/docker network rm github_network_179ba804d671435c9fc1a9e3ec1b53b0
+github_network_179ba804d671435c9fc1a9e3ec1b53b0
