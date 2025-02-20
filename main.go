@@ -107,7 +107,6 @@ func waitForTable(maxAttempts int, delay time.Duration) error {
 }
 
 func main() {
-	// Инициализация базы данных
 	if err := connectDB(); err != nil {
 		log.Fatal(err)
 	}
@@ -118,17 +117,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Создание таблицы
 	if err := initDatabase(); err != nil {
 		log.Fatal(err)
 	}
 
-	// Ждем, пока таблица станет доступной
+	// Ждем пока таблица станет доступной
 	if err := waitForTable(5, time.Second*2); err != nil {
 		log.Fatal(err)
 	}
 
-	// Настройка маршрутизации
 	router := setupRoutes()
 
 	// Запуск сервера
@@ -185,20 +182,17 @@ func handlePostPrices(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Проверка данных, начиная со второй строки
-			for _, row := range rows[1:] { // Пропускаем заголовок
-				if len(row) < 5 { // Убедимся, что в строке достаточно столбцов
+			for _, row := range rows[1:] {
+				if len(row) < 5 {
 					log.Printf("Пропущена строка: недостаточно данных")
 					continue
 				}
 
-				// Пропускаем первый столбец (id) и читаем остальные данные
-				name := row[1]       // Второй столбец
-				category := row[2]   // Третий столбец
-				priceStr := row[3]   // Четвертый столбец
-				createDate := row[4] // Пятый столбец
+				name := row[1]
+				category := row[2]
+				priceStr := row[3]
+				createDate := row[4]
 
-				// Проверка на пустые значения
 				if name == "" || category == "" || priceStr == "" || createDate == "" {
 					log.Printf("Пропущена строка: пустые значения")
 					continue
@@ -216,7 +210,6 @@ func handlePostPrices(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				// Добавляем только нужные данные в правильном порядке
 				records = append(records, []string{
 					name,
 					category,
@@ -297,7 +290,6 @@ func handleGetPrices(w http.ResponseWriter, _ *http.Request) {
 	defer rows.Close()
 
 	var records [][]string
-	// Добавляем заголовки в том же формате, что и во входном файле
 	records = append(records, []string{"id", "name", "category", "price", "create_date"})
 
 	for rows.Next() {
@@ -318,7 +310,7 @@ func handleGetPrices(w http.ResponseWriter, _ *http.Request) {
 			name,
 			category,
 			fmt.Sprintf("%.2f", price),
-			createDate.Format("2006-01-02"), // Изменяем формат даты на YYYY-MM-DD
+			createDate.Format("2006-01-02"), // требуется такой формат по условию
 		})
 	}
 
