@@ -92,6 +92,20 @@ func waitForDB(maxAttempts int, delay time.Duration) error {
 	return fmt.Errorf("не удалось подключиться к базе данных после %d попыток: %v", maxAttempts, err)
 }
 
+func waitForTable(maxAttempts int, delay time.Duration) error {
+	var err error
+	for i := 0; i < maxAttempts; i++ {
+		err = db.QueryRow("SELECT 1 FROM prices LIMIT 1").Err()
+		if err == nil {
+			log.Println("Таблица 'prices' успешно создана и доступна")
+			return nil
+		}
+		log.Printf("Ожидание создания таблицы, попытка %d из %d...", i+1, maxAttempts)
+		time.Sleep(delay)
+	}
+	return fmt.Errorf("таблица 'prices' не создана после %d попыток: %v", maxAttempts, err)
+}
+
 func main() {
 	// Инициализация базы данных
 	if err := connectDB(); err != nil {
@@ -109,13 +123,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Проверяем, что таблица создана
-	if err := db.QueryRow("SELECT 1 FROM prices LIMIT 1").Err(); err != nil {
-		log.Printf("Проверка таблицы: %v", err)
-		// Пробуем создать таблицу еще раз
-		if err := initDatabase(); err != nil {
-			log.Fatal(err)
-		}
+	// Ждем, пока таблица станет доступной
+	if err := waitForTable(5, time.Second*2); err != nil {
+		log.Fatal(err)
 	}
 
 	// Настройка маршрутизации
