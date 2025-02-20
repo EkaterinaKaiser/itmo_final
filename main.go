@@ -11,7 +11,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
+
 	"time"
 
 	_ "github.com/lib/pq"
@@ -247,10 +247,14 @@ func handleGetPrices(w http.ResponseWriter, _ *http.Request) {
 	defer rows.Close()
 
 	var records [][]string
+	// Добавляем заголовки в том же формате, что и во входном файле
+	records = append(records, []string{"id", "name", "category", "price", "create_date"})
+
 	for rows.Next() {
 		var id int
-		var name, category, createDate string
+		var name, category string
 		var price float64
+		var createDate time.Time
 
 		err := rows.Scan(&id, &name, &category, &price, &createDate)
 		if err != nil {
@@ -259,16 +263,12 @@ func handleGetPrices(w http.ResponseWriter, _ *http.Request) {
 			return
 		}
 
-		if idx := strings.Index(createDate, "T"); idx != -1 {
-			createDate = createDate[:idx]
-		}
-
 		records = append(records, []string{
 			strconv.Itoa(id),
 			name,
 			category,
 			fmt.Sprintf("%.2f", price),
-			createDate,
+			createDate.Format("2006-01-02"), // Изменяем формат даты на YYYY-MM-DD
 		})
 	}
 
@@ -280,9 +280,12 @@ func handleGetPrices(w http.ResponseWriter, _ *http.Request) {
 
 	csvData := &bytes.Buffer{}
 	writer := csv.NewWriter(csvData)
-	writer.Write([]string{"id", "name", "category", "price", "create_date"})
 	for _, record := range records {
-		writer.Write(record)
+		if err := writer.Write(record); err != nil {
+			http.Error(w, "Error writing CSV", http.StatusInternalServerError)
+			log.Printf("Ошибка записи в CSV: %v", err)
+			return
+		}
 	}
 	writer.Flush()
 
@@ -295,8 +298,7 @@ func handleGetPrices(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	_, err = io.Copy(fileWriter, csvData)
-	if err != nil {
+	if _, err := io.Copy(fileWriter, csvData); err != nil {
 		http.Error(w, "Error copying data to ZIP archive", http.StatusInternalServerError)
 		log.Printf("Ошибка записи данных в ZIP-архив: %v", err)
 		return
