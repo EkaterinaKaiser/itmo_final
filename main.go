@@ -115,9 +115,7 @@ func main() {
 
 					stmt, err := tx.Prepare(`
                         INSERT INTO prices (name, category, price, create_date) 
-                        VALUES ($1, $2, $3, $4) 
-                        ON CONFLICT (id) DO UPDATE 
-                        SET name=$1, category=$2, price=$3, create_date=$4
+                        VALUES ($1, $2, $3, $4)
                     `)
 					if err != nil {
 						http.Error(w, "SQL preparation error", http.StatusInternalServerError)
@@ -163,23 +161,32 @@ func main() {
 						categorySet[category] = struct{}{}
 					}
 
+					var totalCategories int
+					err = tx.QueryRow("SELECT COUNT(DISTINCT category) FROM prices").Scan(&totalCategories)
+					if err != nil {
+						log.Printf("Ошибка подсчета total_categories: %v", err)
+						tx.Rollback()
+						http.Error(w, "Error calculating total categories", http.StatusInternalServerError)
+						return
+					}
+
 					err = tx.Commit()
 					if err != nil {
 						log.Printf("Ошибка завершения транзакции: %v", err)
 						http.Error(w, "Transaction commit error", http.StatusInternalServerError)
 						return
 					}
+
+					response := map[string]interface{}{
+						"total_items":      totalItems,
+						"total_categories": totalCategories,
+						"total_price":      fmt.Sprintf("%.2f", totalPrice),
+					}
+
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(response)
 				}
 			}
-
-			response := map[string]interface{}{
-				"total_items":      totalItems,
-				"total_categories": len(categorySet),
-				"total_price":      fmt.Sprintf("%.2f", totalPrice),
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
 
 		case http.MethodGet:
 			db, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname))
