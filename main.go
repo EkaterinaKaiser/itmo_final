@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-
 	"time"
 
 	_ "github.com/lib/pq"
@@ -25,17 +24,15 @@ const (
 	dbname   = "project-sem-1"
 )
 
-var db *sql.DB // Глобальная переменная для соединения с БД
+var db *sql.DB
 
 func initDatabase() error {
-	// Сначала удалим существующую таблицу
 	dropTableQuery := `DROP TABLE IF EXISTS prices;`
 	_, err := db.Exec(dropTableQuery)
 	if err != nil {
 		return fmt.Errorf("ошибка удаления таблицы: %v", err)
 	}
 
-	// Создаем таблицу заново
 	createTableQuery := `
     CREATE TABLE prices (
         id SERIAL PRIMARY KEY,
@@ -54,37 +51,52 @@ func initDatabase() error {
 	return nil
 }
 
-func main() {
-	var err error
-	// Инициализация соединения с БД
-	db, err = sql.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname))
-	if err != nil {
-		log.Fatalf("Ошибка подключения к базе данных: %v", err)
-	}
-	defer db.Close() // Закрытие соединения при завершении работы приложения
-
-	// Инициализация базы данных
-	if err := initDatabase(); err != nil {
-		log.Fatalf("Ошибка инициализации базы данных: %v", err)
-	}
-
+func setupRoutes() *http.ServeMux {
 	router := http.NewServeMux()
-	router.HandleFunc("/api/v0/prices", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			handlePostPrices(w, r)
+	router.HandleFunc("/api/v0/prices", handlePrices)
+	return router
+}
 
-		case http.MethodGet:
-			handleGetPrices(w, r)
+func handlePrices(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		handlePostPrices(w, r)
+	case http.MethodGet:
+		handleGetPrices(w, r)
+	default:
+		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
+	}
+}
 
-		default:
-			http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
-		}
-	})
+func connectDB() error {
+	var err error
+	db, err = sql.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname))
+	if err != nil {
+		return fmt.Errorf("ошибка подключения к базе данных: %v", err)
+	}
+	return nil
+}
 
+func main() {
+	// Инициализация базы данных
+	if err := connectDB(); err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// Создание таблицы
+	if err := initDatabase(); err != nil {
+		log.Fatal(err)
+	}
+
+	// Настройка маршрутизации
+	router := setupRoutes()
+
+	// Запуск сервера
 	fmt.Println("Server started on :8080")
 	if err := http.ListenAndServe(":8080", router); err != nil {
-		log.Fatalf("Ошибка запуска сервера: %v", err)
+		log.Fatal(err)
 	}
 }
 
