@@ -63,131 +63,7 @@ func main() {
 	router.HandleFunc("/api/v0/prices", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			file, _, err := r.FormFile("file")
-			if err != nil {
-				http.Error(w, "Error reading file", http.StatusBadRequest)
-				log.Printf("Ошибка чтения файла: %v", err)
-				return
-			}
-			defer file.Close()
-
-			buf := new(bytes.Buffer)
-			_, err = buf.ReadFrom(file)
-			if err != nil {
-				http.Error(w, "Error reading file content", http.StatusBadRequest)
-				log.Printf("Ошибка чтения содержимого файла: %v", err)
-				return
-			}
-
-			reader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
-			if err != nil {
-				http.Error(w, "Error unzipping file", http.StatusBadRequest)
-				log.Printf("Ошибка распаковки ZIP-архива: %v", err)
-				return
-			}
-
-			var totalItems int
-			var totalPrice float64
-			categorySet := make(map[string]struct{})
-
-			tx, err := db.Begin()
-			if err != nil {
-				http.Error(w, "Transaction error", http.StatusInternalServerError)
-				log.Printf("Ошибка начала транзакции: %v", err)
-				return
-			}
-
-			stmt, err := tx.Prepare(`
-                INSERT INTO prices (name, category, price, create_date) 
-                VALUES ($1, $2, $3, $4)
-            `)
-			if err != nil {
-				http.Error(w, "SQL preparation error", http.StatusInternalServerError)
-				log.Printf("Ошибка подготовки SQL-запроса: %v", err)
-				tx.Rollback()
-				return
-			}
-			defer stmt.Close()
-
-			for _, f := range reader.File {
-				if f.Name == "data.csv" {
-					csvFile, err := f.Open()
-					if err != nil {
-						http.Error(w, "Error opening CSV file", http.StatusInternalServerError)
-						log.Printf("Ошибка открытия CSV-файла: %v", err)
-						return
-					}
-					defer csvFile.Close()
-
-					rows, err := csv.NewReader(csvFile).ReadAll()
-					if err != nil {
-						http.Error(w, "Error reading CSV", http.StatusInternalServerError)
-						log.Printf("Ошибка чтения CSV-файла: %v", err)
-						return
-					}
-
-					for _, row := range rows[1:] {
-						name := row[0]
-						category := row[1]
-						priceStr := row[2]
-						createDate := row[3]
-
-						if name == "" || category == "" || priceStr == "" || createDate == "" {
-							log.Printf("Пропущена строка: недостаточно данных")
-							continue
-						}
-
-						price, err := strconv.ParseFloat(priceStr, 64)
-						if err != nil {
-							log.Printf("Ошибка преобразования цены: %v, строка: %v", err, row)
-							continue
-						}
-
-						createDateParsed, err := time.Parse("2006-01-02", createDate)
-						if err != nil {
-							log.Printf("Ошибка парсинга даты: %v, строка: %v", err, row)
-							continue
-						}
-
-						_, err = stmt.Exec(name, category, price, createDateParsed)
-						if err != nil {
-							log.Printf("Ошибка выполнения запроса: %v, строка: %v", err, row)
-							tx.Rollback()
-							http.Error(w, "Error inserting data", http.StatusInternalServerError)
-							return
-						}
-
-						totalItems++
-						totalPrice += price
-						categorySet[category] = struct{}{}
-					}
-
-					var totalCategories int
-					err = tx.QueryRow("SELECT COUNT(DISTINCT category) FROM prices").Scan(&totalCategories)
-					if err != nil {
-						log.Printf("Ошибка подсчета total_categories: %v", err)
-						tx.Rollback()
-						http.Error(w, "Error calculating total categories", http.StatusInternalServerError)
-						return
-					}
-
-					err = tx.Commit()
-					if err != nil {
-						log.Printf("Ошибка завершения транзакции: %v", err)
-						http.Error(w, "Transaction commit error", http.StatusInternalServerError)
-						return
-					}
-
-					response := map[string]interface{}{
-						"total_items":      totalItems,
-						"total_categories": totalCategories,
-						"total_price":      fmt.Sprintf("%.2f", totalPrice),
-					}
-
-					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(response)
-				}
-			}
+			handlePostPrices(w, r)
 
 		case http.MethodGet:
 			handleGetPrices(w, r)
@@ -201,6 +77,141 @@ func main() {
 	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
+}
+
+func handlePostPrices(w http.ResponseWriter, r *http.Request) {
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Error reading file", http.StatusBadRequest)
+		log.Printf("Ошибка чтения файла: %v", err)
+		return
+	}
+	defer file.Close()
+
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(file)
+	if err != nil {
+		http.Error(w, "Error reading file content", http.StatusBadRequest)
+		log.Printf("Ошибка чтения содержимого файла: %v", err)
+		return
+	}
+
+	reader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	if err != nil {
+		http.Error(w, "Error unzipping file", http.StatusBadRequest)
+		log.Printf("Ошибка распаковки ZIP-архива: %v", err)
+		return
+	}
+
+	var records [][]string
+	var totalItems int
+	var totalPrice float64
+	categorySet := make(map[string]struct{})
+
+	// Чтение и проверка данных из CSV
+	for _, f := range reader.File {
+		if f.Name == "data.csv" {
+			csvFile, err := f.Open()
+			if err != nil {
+				http.Error(w, "Error opening CSV file", http.StatusInternalServerError)
+				log.Printf("Ошибка открытия CSV-файла: %v", err)
+				return
+			}
+			defer csvFile.Close()
+
+			rows, err := csv.NewReader(csvFile).ReadAll()
+			if err != nil {
+				http.Error(w, "Error reading CSV", http.StatusInternalServerError)
+				log.Printf("Ошибка чтения CSV-файла: %v", err)
+				return
+			}
+
+			// Проверка данных
+			for _, row := range rows[1:] {
+				name := row[0]
+				category := row[1]
+				priceStr := row[2]
+				createDate := row[3]
+
+				if name == "" || category == "" || priceStr == "" || createDate == "" {
+					log.Printf("Пропущена строка: недостаточно данных")
+					continue
+				}
+
+				price, err := strconv.ParseFloat(priceStr, 64)
+				if err != nil {
+					log.Printf("Ошибка преобразования цены: %v, строка: %v", err, row)
+					continue
+				}
+
+				createDateParsed, err := time.Parse("2006-01-02", createDate)
+				if err != nil {
+					log.Printf("Ошибка парсинга даты: %v, строка: %v", err, row)
+					continue
+				}
+
+				records = append(records, []string{name, category, fmt.Sprintf("%.2f", price), createDateParsed.Format("2006-01-02")})
+				totalItems++
+				totalPrice += price
+				categorySet[category] = struct{}{}
+			}
+		}
+	}
+
+	// Открытие транзакции и вставка данных
+	tx, err := db.Begin()
+	if err != nil {
+		http.Error(w, "Transaction error", http.StatusInternalServerError)
+		log.Printf("Ошибка начала транзакции: %v", err)
+		return
+	}
+
+	stmt, err := tx.Prepare(`
+        INSERT INTO prices (name, category, price, create_date) 
+        VALUES ($1, $2, $3, $4)
+    `)
+	if err != nil {
+		http.Error(w, "SQL preparation error", http.StatusInternalServerError)
+		log.Printf("Ошибка подготовки SQL-запроса: %v", err)
+		tx.Rollback()
+		return
+	}
+	defer stmt.Close()
+
+	for _, record := range records {
+		_, err = stmt.Exec(record[0], record[1], record[2], record[3])
+		if err != nil {
+			log.Printf("Ошибка выполнения запроса: %v, строка: %v", err, record)
+			tx.Rollback()
+			http.Error(w, "Error inserting data", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	var totalCategories int
+	err = tx.QueryRow("SELECT COUNT(DISTINCT category) FROM prices").Scan(&totalCategories)
+	if err != nil {
+		log.Printf("Ошибка подсчета total_categories: %v", err)
+		tx.Rollback()
+		http.Error(w, "Error calculating total categories", http.StatusInternalServerError)
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Printf("Ошибка завершения транзакции: %v", err)
+		http.Error(w, "Transaction commit error", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"total_items":      totalItems,
+		"total_categories": totalCategories,
+		"total_price":      fmt.Sprintf("%.2f", totalPrice),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func handleGetPrices(w http.ResponseWriter, _ *http.Request) {
