@@ -189,81 +189,7 @@ func main() {
 			}
 
 		case http.MethodGet:
-			db, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname))
-			if err != nil {
-				http.Error(w, "Database connection error", http.StatusInternalServerError)
-				log.Printf("Ошибка подключения к базе данных: %v", err)
-				return
-			}
-			defer db.Close()
-
-			rows, err := db.Query("SELECT id, name, category, price, create_date FROM prices")
-			if err != nil {
-				http.Error(w, "Error querying database", http.StatusInternalServerError)
-				log.Printf("Ошибка запроса данных из базы: %v", err)
-				return
-			}
-			defer rows.Close()
-
-			var records [][]string
-			for rows.Next() {
-				var id int
-				var name, category, createDate string
-				var price float64
-
-				err := rows.Scan(&id, &name, &category, &price, &createDate)
-				if err != nil {
-					http.Error(w, "Error scanning rows", http.StatusInternalServerError)
-					log.Printf("Ошибка чтения строки из базы: %v", err)
-					return
-				}
-
-				if idx := strings.Index(createDate, "T"); idx != -1 {
-					createDate = createDate[:idx]
-				}
-
-				records = append(records, []string{
-					strconv.Itoa(id),
-					name,
-					category,
-					fmt.Sprintf("%.2f", price),
-					createDate,
-				})
-			}
-
-			csvData := &bytes.Buffer{}
-			writer := csv.NewWriter(csvData)
-			writer.Write([]string{"id", "name", "category", "price", "create_date"})
-			for _, record := range records {
-				writer.Write(record)
-			}
-			writer.Flush()
-
-			zipBuffer := new(bytes.Buffer)
-			zipWriter := zip.NewWriter(zipBuffer)
-			fileWriter, err := zipWriter.Create("data.csv")
-			if err != nil {
-				http.Error(w, "Error creating file in ZIP archive", http.StatusInternalServerError)
-				log.Printf("Ошибка создания файла в ZIP-архиве: %v", err)
-				return
-			}
-
-			_, err = io.Copy(fileWriter, csvData)
-			if err != nil {
-				http.Error(w, "Error copying data to ZIP archive", http.StatusInternalServerError)
-				log.Printf("Ошибка записи данных в ZIP-архив: %v", err)
-				return
-			}
-
-			if err := zipWriter.Close(); err != nil {
-				http.Error(w, "Error closing ZIP archive", http.StatusInternalServerError)
-				log.Printf("Ошибка закрытия ZIP-архива: %v", err)
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/zip")
-			w.Header().Set("Content-Disposition", "attachment; filename=response.zip")
-			w.Write(zipBuffer.Bytes())
+			handleGetPrices(w, r)
 
 		default:
 			http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
@@ -274,4 +200,88 @@ func main() {
 	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
+}
+
+func handleGetPrices(w http.ResponseWriter, _ *http.Request) {
+	db, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname))
+	if err != nil {
+		http.Error(w, "Database connection error", http.StatusInternalServerError)
+		log.Printf("Ошибка подключения к базе данных: %v", err)
+		return
+	}
+	defer db.Close()
+
+	rows, err := db.Query("SELECT id, name, category, price, create_date FROM prices")
+	if err != nil {
+		http.Error(w, "Error querying database", http.StatusInternalServerError)
+		log.Printf("Ошибка запроса данных из базы: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	var records [][]string
+	for rows.Next() {
+		var id int
+		var name, category, createDate string
+		var price float64
+
+		err := rows.Scan(&id, &name, &category, &price, &createDate)
+		if err != nil {
+			http.Error(w, "Error scanning rows", http.StatusInternalServerError)
+			log.Printf("Ошибка чтения строки из базы: %v", err)
+			return
+		}
+
+		if idx := strings.Index(createDate, "T"); idx != -1 {
+			createDate = createDate[:idx]
+		}
+
+		records = append(records, []string{
+			strconv.Itoa(id),
+			name,
+			category,
+			fmt.Sprintf("%.2f", price),
+			createDate,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Error during rows iteration", http.StatusInternalServerError)
+		log.Printf("Ошибка во время итерации по строкам: %v", err)
+		return
+	}
+
+	csvData := &bytes.Buffer{}
+	writer := csv.NewWriter(csvData)
+	writer.Write([]string{"id", "name", "category", "price", "create_date"})
+	for _, record := range records {
+		writer.Write(record)
+	}
+	writer.Flush()
+
+	zipBuffer := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(zipBuffer)
+	fileWriter, err := zipWriter.Create("data.csv")
+	if err != nil {
+		http.Error(w, "Error creating file in ZIP archive", http.StatusInternalServerError)
+		log.Printf("Ошибка создания файла в ZIP-архиве: %v", err)
+		return
+	}
+
+	_, err = io.Copy(fileWriter, csvData)
+	if err != nil {
+		http.Error(w, "Error copying data to ZIP archive", http.StatusInternalServerError)
+		log.Printf("Ошибка записи данных в ZIP-архив: %v", err)
+		return
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		http.Error(w, "Error closing ZIP archive", http.StatusInternalServerError)
+		log.Printf("Ошибка закрытия ZIP-архива: %v", err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", "attachment; filename=response.zip")
+	w.Write(zipBuffer.Bytes())
 }
