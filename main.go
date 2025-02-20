@@ -28,20 +28,29 @@ const (
 var db *sql.DB // Глобальная переменная для соединения с БД
 
 func initDatabase() error {
+	// Сначала удалим существующую таблицу
+	dropTableQuery := `DROP TABLE IF EXISTS prices;`
+	_, err := db.Exec(dropTableQuery)
+	if err != nil {
+		return fmt.Errorf("ошибка удаления таблицы: %v", err)
+	}
+
+	// Создаем таблицу заново
 	createTableQuery := `
-    CREATE TABLE IF NOT EXISTS prices (
+    CREATE TABLE prices (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         category VARCHAR(255) NOT NULL,
         price NUMERIC(10, 2) NOT NULL,
         create_date TIMESTAMP NOT NULL
-    );
-    `
-	_, err := db.Exec(createTableQuery)
+    );`
+
+	_, err = db.Exec(createTableQuery)
 	if err != nil {
 		return fmt.Errorf("ошибка создания таблицы: %v", err)
 	}
-	log.Println("Таблица 'prices' успешно создана (если не существовала)")
+
+	log.Println("Таблица 'prices' успешно пересоздана")
 	return nil
 }
 
@@ -126,20 +135,22 @@ func handlePostPrices(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Проверка данных, начиная со второго столбца
+			// Проверка данных, начиная со второй строки
 			for _, row := range rows[1:] { // Пропускаем заголовок
-				if len(row) < 4 { // Убедимся, что в строке достаточно столбцов
+				if len(row) < 5 { // Убедимся, что в строке достаточно столбцов
 					log.Printf("Пропущена строка: недостаточно данных")
 					continue
 				}
 
+				// Пропускаем первый столбец (id) и читаем остальные данные
 				name := row[1]       // Второй столбец
 				category := row[2]   // Третий столбец
 				priceStr := row[3]   // Четвертый столбец
 				createDate := row[4] // Пятый столбец
 
+				// Проверка на пустые значения
 				if name == "" || category == "" || priceStr == "" || createDate == "" {
-					log.Printf("Пропущена строка: недостаточно данных")
+					log.Printf("Пропущена строка: пустые значения")
 					continue
 				}
 
@@ -155,7 +166,14 @@ func handlePostPrices(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				records = append(records, []string{name, category, fmt.Sprintf("%.2f", price), createDateParsed.Format("2006-01-02")})
+				// Добавляем только нужные данные в правильном порядке
+				records = append(records, []string{
+					name,
+					category,
+					fmt.Sprintf("%.2f", price),
+					createDateParsed.Format("2006-01-02 15:04:05"),
+				})
+
 				totalItems++
 				totalPrice += price
 				categorySet[category] = struct{}{}
@@ -173,7 +191,7 @@ func handlePostPrices(w http.ResponseWriter, r *http.Request) {
 
 	stmt, err := tx.Prepare(`
         INSERT INTO prices (name, category, price, create_date) 
-        VALUES ($1, $2, $3, $4)
+        VALUES ($1, $2, $3, $4::timestamp)
     `)
 	if err != nil {
 		http.Error(w, "SQL preparation error", http.StatusInternalServerError)
